@@ -81,7 +81,18 @@ EndFunction
 ;  Female-only, held in place. Casual poses are freed if the NPC enters combat
 ;  (no one is "holding" them); the submission vibe stays locked through combat.
 ; ════════════════════════════════════════════════════════════════════════════
-Float Property fPoseSafetyTimeout = 30.0 Auto   ; real seconds — NPC poses auto-end after this (LLM rarely picks StopPosing)
+; Real-seconds hard stop — NPC poses auto-end after this (the LLM rarely picks StopPosing).
+; Active vibes (workout / stretch / dance) hold longer; everything else ends sooner.
+Float Property fPoseTimeoutActive  = 45.0 Auto   ; workout, stretch, dance, dance_sexy
+Float Property fPoseTimeoutDefault = 25.0 Auto   ; all other vibes
+
+; Per-vibe hard-stop duration. Exercise/stretch/dance read well held longer; the rest get 25s.
+Float Function _VibeTimeout(String vibe)
+    If vibe == "workout" || vibe == "stretch" || vibe == "dance" || vibe == "dance_sexy"
+        Return fPoseTimeoutActive
+    EndIf
+    Return fPoseTimeoutDefault
+EndFunction
 
 ; Comma-separated GS events per vibe (compact; edit to re-curate). Mirrors poses.js groups
 ; minus the player-only ones (explicit, situational).
@@ -153,9 +164,10 @@ Function _PoseVibe(Actor ak, String vibe, String label)
         ak.SetDontMove(True)   ; bound/surrendered — a fight shouldn't break it
     EndIf
     Debug.SendAnimationEvent(ak, ev)
-    StorageUtil.SetStringValue(ak, "GSAnim.Pose",  ev)
-    StorageUtil.SetFloatValue(ak,  "GSAnim.Start", Utility.GetCurrentRealTime())
-    StorageUtil.SetIntValue(ak,    "GSAnim.LockAI", lockAI as Int)
+    StorageUtil.SetStringValue(ak, "GSAnim.Pose",    ev)
+    StorageUtil.SetFloatValue(ak,  "GSAnim.Start",   Utility.GetCurrentRealTime())
+    StorageUtil.SetFloatValue(ak,  "GSAnim.Timeout", _VibeTimeout(vibe))
+    StorageUtil.SetIntValue(ak,    "GSAnim.LockAI",  lockAI as Int)
     StorageUtil.FormListAdd(None,  "GSAnim.Posing", ak, False)
     SkyrimNetApi.RegisterEvent("gsanim_npc_pose", \
         ak.GetDisplayName() + " strikes " + label + ", holding it in place.", ak, None)
@@ -184,7 +196,8 @@ Event OnUpdate()
         Else
             Bool  lockAI  = StorageUtil.GetIntValue(ak, "GSAnim.LockAI", 0) == 1
             Float elapsed = Utility.GetCurrentRealTime() - StorageUtil.GetFloatValue(ak, "GSAnim.Start", 0.0)
-            If (!lockAI && ak.IsInCombat()) || elapsed > fPoseSafetyTimeout || ak.IsDead()
+            Float timeout = StorageUtil.GetFloatValue(ak, "GSAnim.Timeout", fPoseTimeoutDefault)
+            If (!lockAI && ak.IsInCombat()) || elapsed > timeout || ak.IsDead()
                 _StopActorPose(ak)
                 StorageUtil.FormListRemoveAt(None, "GSAnim.Posing", i)
             Else
