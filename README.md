@@ -42,4 +42,10 @@ Work in progress. The pose grid currently shows **pose numbers** (e.g. `GS123`);
 will be added category-by-category as screenshots become available.
 
 ## Compatibility
-Skyrim **SE 1.5.97 / AE** only — not VR (same SKSE-plugin stack reasons as the Baka integration).
+Skyrim **SE 1.5.97 / AE / VR**. The SKSE plugin is built on CommonLibSSE-NG, so the one DLL
+loads on all three runtimes.
+- **NPC poses** (LLM-driven) work fully in VR.
+- The **player pose grid** is a PrismaUI overlay — usable in VR only as far as PrismaUI itself
+  supports VR menus/cursor.
+- The "movement ends the pose" key-watch listens for WASD/jump, which VR doesn't use for
+  locomotion; in VR a pose simply ends on its ~30s safety timeout (or via a stop action) instead.
