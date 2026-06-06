@@ -1,0 +1,14 @@
+name: StopPosing
+description: |
+  Stop holding your current GSPoser body pose and return to normal stance/behaviour.
+  Use this when you (a posing NPC) are done — finished showing off, someone speaks to you,
+  the mood shifts, or you simply want to move again. Harmless if you are not currently posing.
+questEditorId: SkyrimNet_AnimationsGS
+scriptName: SkyrimNet_AnimationsGS
+executionFunctionName: StopPosing_Execute
+parameterMapping:
+  - type: speaker
+    name: akInitiator
+    description: YOU — stop your held pose.
+enabled: true
+defaultPriority: 2

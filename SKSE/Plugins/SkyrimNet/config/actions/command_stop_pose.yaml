@@ -1,0 +1,16 @@
+name: CommandStopPose
+description: |
+  Tell another character who is currently holding a GSPoser pose to STOP and return to normal —
+  e.g. "enough", "stop that", "get up". Only meaningful when the target is actually posing.
+questEditorId: SkyrimNet_AnimationsGS
+scriptName: SkyrimNet_AnimationsGS
+executionFunctionName: CommandStopPose_Execute
+parameterMapping:
+  - type: speaker
+    name: akInitiator
+    description: YOU — the one telling them to stop.
+  - type: dynamic
+    name: akTarget
+    description: The posing character you are telling to stop.
+enabled: true
+defaultPriority: 2

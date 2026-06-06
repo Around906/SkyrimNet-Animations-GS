@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GS Pose Selector</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body { width: 100vw; height: 100vh; overflow: hidden; background: transparent;
+         font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif; }
+
+  #backdrop { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+              background: rgba(0,0,0,0.5); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+  #backdrop.visible { opacity: 1; pointer-events: all; }
+
+  #panel {
+    zoom: 1.3;
+    position: relative; width: 740px; max-width: 94vw; height: 560px; max-height: 86vh;
+    display: flex; flex-direction: column;
+    background: linear-gradient(160deg, rgba(10,8,5,.97) 0%, rgba(18,13,6,.97) 100%);
+    border: 1px solid rgba(139,105,20,.55);
+    box-shadow: 0 0 0 1px rgba(196,162,72,.08), 0 12px 48px rgba(0,0,0,.85), inset 0 0 60px rgba(0,0,0,.4);
+    transform: translateY(-10px) scale(.99); opacity: 0; transition: transform .2s ease, opacity .2s ease;
+  }
+  #backdrop.visible #panel { transform: translateY(0) scale(1); opacity: 1; }
+  #panel::before, #panel::after { content: ''; position: absolute; width: 14px; height: 14px;
+    border-color: rgba(196,162,72,.6); border-style: solid; pointer-events: none; z-index: 1; }
+  #panel::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+  #panel::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+  .panel-header { padding: 12px 18px 10px; border-bottom: 1px solid rgba(196,162,72,.18);
+                  display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .header-icon { color: rgba(196,162,72,.7); font-size: 14px; }
+  .header-label { color: #d4b86a; font-size: 14px; letter-spacing: .05em; }
+  .header-sub { color: rgba(200,185,140,.45); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+
+  .filter-box { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+  .filter-box input {
+    width: 80px; padding: 3px 7px; font-family: inherit; font-size: 11px;
+    color: #e8d8a0; background: rgba(196,162,72,.06); border: 1px solid rgba(196,162,72,.3);
+    outline: none; border-radius: 2px;
+  }
+  .filter-box input::placeholder { color: rgba(160,130,70,.5); }
+
+  .ui-scale { display: inline-flex; align-items: center; gap: 6px; }
+  .ui-scale-btn { width: 18px; height: 18px; line-height: 15px; text-align: center; font-size: 14px;
+    cursor: pointer; border-radius: 2px; color: rgba(220,200,150,.9);
+    background: rgba(196,162,72,.08); border: 1px solid rgba(196,162,72,.4); }
+  .ui-scale-btn:hover { background: rgba(196,162,72,.22); }
+  .ui-scale-val { min-width: 34px; text-align: center; font-size: 10px; letter-spacing: .08em;
+    color: rgba(196,162,72,.7); font-variant-numeric: tabular-nums; }
+
+  /* Body: left category sidebar (~1/5) + right grid (~4/5) */
+  .body-row { flex: 1; display: flex; min-height: 0; }
+  .cat-sidebar { width: 20%; min-width: 122px; max-width: 172px; flex-shrink: 0;
+                 overflow-y: auto; border-right: 1px solid rgba(196,162,72,.12); padding: 6px 0; }
+  .cat-sidebar::-webkit-scrollbar { width: 8px; }
+  .cat-sidebar::-webkit-scrollbar-thumb { background: rgba(196,162,72,.25); border-radius: 4px; }
+  .cat-tab { padding: 9px 10px 9px 13px; color: rgba(160,130,70,.62); font-size: 11px; letter-spacing: .02em;
+             cursor: pointer; border-left: 2px solid transparent; transition: all .13s;
+             display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+  .cat-tab:hover { color: #c4a248; background: rgba(196,162,72,.05); }
+  .cat-tab.active { color: #e8d8a0; background: rgba(196,162,72,.1); border-left-color: #c4a248; }
+  .cat-tab .ct-count { color: rgba(160,130,70,.5); font-size: 9px; font-variant-numeric: tabular-nums; }
+
+  /* Scrollable grid */
+  .grid-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 14px; min-height: 0; }
+  .grid-wrap::-webkit-scrollbar { width: 9px; }
+  .grid-wrap::-webkit-scrollbar-thumb { background: rgba(196,162,72,.3); border-radius: 4px; }
+  .pose-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+
+  .pose-cell { position: relative; aspect-ratio: 1 / 1; border: 1px solid rgba(196,162,72,.22);
+    background: rgba(196,162,72,.04); cursor: pointer; overflow: hidden; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center; transition: all .12s; }
+  .pose-cell:hover { border-color: rgba(196,162,72,.7); background: rgba(196,162,72,.12);
+    transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.5); }
+  .pose-cell img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  /* number = small corner badge (always); description fills the cell when there's no thumbnail */
+  .pose-cell .num { position: absolute; top: 2px; right: 4px; z-index: 2; font-size: 10px;
+    color: #f0e4b0; text-shadow: 0 1px 3px #000, 0 0 4px #000; font-variant-numeric: tabular-nums; }
+  .pose-cell .cap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 5px; text-align: center; font-size: 9px; line-height: 1.18; z-index: 1; color: rgba(222,206,162,.92); }
+  .pose-cell.has-img .cap { display: none; }   /* thumbnail present -> description shows on hover (title) */
+
+  .panel-footer { padding: 9px 18px; border-top: 1px solid rgba(196,162,72,.12);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+  .footer-hint { color: rgba(100,85,50,.7); font-size: 10px; letter-spacing: .1em; }
+  .footer-count { color: rgba(160,130,70,.55); font-size: 10px; letter-spacing: .08em; }
+  .btn { padding: 5px 14px; font-family: inherit; font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; cursor: pointer; background: transparent; transition: all .14s; }
+  .btn-cancel { border: 1px solid rgba(170,80,80,.35); color: rgba(180,90,90,.7); }
+  .btn-cancel:hover { border-color: rgba(210,90,90,.65); color: #c86868; background: rgba(200,80,80,.07); }
+</style>
+</head>
+<body>
+
+<div id="backdrop" onclick="onBackdropClick(event)">
+  <div id="panel">
+    <div class="panel-header">
+      <span class="header-icon">&#9672;</span>
+      <span class="header-label">Pose Selector</span>
+      <span class="header-sub" id="cat-name"></span>
+      <span class="filter-box">
+        <input id="filter" type="text" placeholder="search…" oninput="onFilter()">
+        <span class="ui-scale" title="Window size">
+          <button class="ui-scale-btn" onclick="bumpScale(-1)">&minus;</button>
+          <span class="ui-scale-val" id="ui-scale-val">100%</span>
+          <button class="ui-scale-btn" onclick="bumpScale(1)">+</button>
+        </span>
+      </span>
+    </div>
+
+    <div class="body-row">
+      <div class="cat-sidebar" id="cat-tabs"></div>
+      <div class="grid-wrap"><div class="pose-grid" id="pose-grid"></div></div>
+    </div>
+
+    <div class="panel-footer">
+      <span class="footer-hint">Click a pose &middot; Esc cancels</span>
+      <span class="footer-count" id="count"></span>
+      <button class="btn btn-cancel" onclick="cancel()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="poses.js"></script>
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────
+const CATS = (window.GS_POSES && window.GS_POSES.categories) ? window.GS_POSES.categories : [];
+let g_open      = false;
+let g_activeCat = CATS.length ? CATS[0].id : null;
+let g_filter    = '';
+
+// ── Entry point (called from C++:  prisma->Invoke(view, "window.gsanim_open()")) ──
+window.gsanim_open = function() {
+  g_open = true;
+  _buildTabs();
+  _selectCat(g_activeCat || (CATS[0] && CATS[0].id));
+  document.getElementById('filter').value = ''; g_filter = '';
+  applyScale();
+  document.getElementById('backdrop').classList.add('visible');
+};
+
+function _buildTabs() {
+  const el = document.getElementById('cat-tabs'); el.innerHTML = '';
+  CATS.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'cat-tab' + (c.id === g_activeCat ? ' active' : '');
+    d.innerHTML = '<span>' + c.name + '</span><span class="ct-count">' + c.poses.length + '</span>';
+    d.onclick = () => _selectCat(c.id);
+    el.appendChild(d);
+  });
+}
+
+function _cat(id) { return CATS.find(c => c.id === id) || CATS[0]; }
+
+function _selectCat(id) {
+  g_activeCat = id;
+  _buildTabs();
+  const cat = _cat(id);
+  document.getElementById('cat-name').textContent = cat ? ('Poses ' + cat.name) : '';
+  _renderGrid();
+}
+
+function _renderGrid() {
+  const cat = _cat(g_activeCat);
+  const grid = document.getElementById('pose-grid'); grid.innerHTML = '';
+  let shown = 0;
+  (cat ? cat.poses : []).forEach(p => {
+    if (g_filter && String(p.n).indexOf(g_filter) === -1
+        && (!p.d || p.d.toLowerCase().indexOf(g_filter) === -1)) return;
+    shown++;
+    const cell = document.createElement('div');
+    cell.className = 'pose-cell';
+    const img = document.createElement('img');
+    img.src = 'images/' + p.e + '.png';
+    img.onload  = () => cell.classList.add('has-img');
+    img.onerror = () => { img.remove(); };   // no thumbnail yet -> show the description
+    const num = document.createElement('span');
+    num.className = 'num'; num.textContent = p.n;
+    cell.appendChild(img); cell.appendChild(num);
+    if (p.d) { const cap = document.createElement('span'); cap.className = 'cap'; cap.textContent = p.d; cell.appendChild(cap); }
+    cell.title = 'GS' + p.n + (p.d ? ' — ' + p.d : '');
+    cell.onclick = () => _choose(p.e, p.d);
+    grid.appendChild(cell);
+  });
+  document.getElementById('count').textContent = shown + ' pose' + (shown === 1 ? '' : 's');
+}
+
+function onFilter() {
+  g_filter = (document.getElementById('filter').value || '').toLowerCase().trim();
+  _renderGrid();
+}
+
+// ── Result / close ────────────────────────────────────────────────────────
+function _choose(ev, desc) { _close(); _send(ev + (desc ? '|' + desc : '')); }
+function cancel()    { _close(); _send(''); }
+
+function _close() {
+  g_open = false;
+  document.getElementById('backdrop').classList.remove('visible');
+}
+
+// JS -> C++. The DLL injects window.gsanim_chose; in a plain browser it just logs.
+function _send(value) {
+  try { window.gsanim_chose(value); }
+  catch (e) { console.log('[GSAnim] chose =', JSON.stringify(value), '(gsanim_chose unavailable in preview)'); }
+}
+
+function onBackdropClick(e) { if (e.target === document.getElementById('backdrop')) cancel(); }
+
+document.addEventListener('keydown', e => {
+  if (!g_open) return;
+  if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); cancel(); }
+});
+
+// ── Window-size multiplier (zoom, persisted) ──────────────────────────────
+const SCALE_KEY = 'gsanim_ui_scale', BASE_ZOOM = 1.3, S_MIN = 0.6, S_MAX = 2.0, S_STEP = 0.1;
+function getScale() { let v = parseFloat(localStorage.getItem(SCALE_KEY)); if (!isFinite(v)) v = 1.0;
+  return Math.min(S_MAX, Math.max(S_MIN, v)); }
+function applyScale() { const s = getScale();
+  const p = document.getElementById('panel'); if (p) p.style.zoom = (BASE_ZOOM * s).toFixed(3);
+  const v = document.getElementById('ui-scale-val'); if (v) v.textContent = Math.round(s * 100) + '%'; }
+function bumpScale(dir) { let s = getScale() + dir * S_STEP;
+  s = Math.min(S_MAX, Math.max(S_MIN, Math.round(s * 100) / 100));
+  localStorage.setItem(SCALE_KEY, String(s)); applyScale(); }
+applyScale();
+
+// ── Browser preview (inert inside Skyrim/PrismaUI) ────────────────────────
+(function preview() {
+  if (typeof window.gsanim_chose === 'function') return;   // in-game
+  const label = document.createElement('div');
+  label.style.cssText = 'position:fixed;top:10px;left:12px;color:rgba(196,162,72,.55);font-size:11px;'
+    + 'letter-spacing:.1em;font-family:monospace;pointer-events:none;z-index:9999';
+  label.textContent = '⟳ PREVIEW  ' + CATS.length + ' categories / '
+    + CATS.reduce((a,c)=>a+c.poses.length,0) + ' poses  (click a pose to log; Esc to close)';
+  document.body.appendChild(label);
+  setTimeout(() => window.gsanim_open(), 50);
+})();
+</script>
+</body>
+</html>

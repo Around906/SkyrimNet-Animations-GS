@@ -1,0 +1,39 @@
+name: PoseSeduce
+description: |
+  YOU (a female NPC) strike a seductive standing pose — striking a GSPoser body pose and holding it in place.
+  FEMALE CHARACTERS ONLY. You hold the pose until you choose to stop (use StopPosing) — it also
+  ends on its own if a fight starts or after a while.
+
+  WHEN: a fitting, unhurried moment — flirting, showing off, relaxing, performing, idling.
+  DO NOT USE: in combat, in danger, or during a sex scene.
+questEditorId: SkyrimNet_AnimationsGS
+scriptName: SkyrimNet_AnimationsGS
+executionFunctionName: PoseSeduce_Execute
+parameterMapping:
+  - type: speaker
+    name: akInitiator
+    description: YOU — the one striking the pose.
+enabled: true
+defaultPriority: 2
+eligibilityRules:
+  - conditions:
+      - decoratorName: "is_in_combat"
+        arguments: ["currentActor"]
+        comparisonOperator: "=="
+        expectedValue: false
+    logicalOperator: "AND"
+    required: true
+  - conditions:
+      - decoratorName: "get_faction_rank"
+        arguments: ["currentActor", "SexLabAnimatingFaction"]
+        comparisonOperator: "<"
+        expectedValue: 0
+    logicalOperator: "AND"
+    required: true
+  - conditions:
+      - decoratorName: "get_faction_rank"
+        arguments: ["currentActor", "OStimActorCountFaction"]
+        comparisonOperator: "<"
+        expectedValue: 0
+    logicalOperator: "AND"
+    required: true
