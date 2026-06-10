@@ -37,3 +37,10 @@ eligibilityRules:
         expectedValue: 0
     logicalOperator: "AND"
     required: true
+  - conditions:
+      - decoratorName: "is_busy"
+        arguments: ["currentActor"]
+        comparisonOperator: "=="
+        expectedValue: false
+    logicalOperator: "AND"
+    required: true

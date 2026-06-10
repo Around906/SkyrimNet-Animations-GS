@@ -144,6 +144,11 @@ Function _PacifyGS(Actor ak, Bool on)
 EndFunction
 
 ; Play a random pose from `vibe` on a FEMALE NPC, held in place; notify SkyrimNet.
+; NOTE: "don't pose when busy" is enforced at the ELIGIBILITY layer (each pose_*.yaml gates on
+; is_in_combat==false, is_busy==false, and not in the SexLab/OStim animating factions), so the LLM
+; never picks a pose for an occupied NPC. The OnUpdate monitor also frees a casual poser who later
+; enters combat. We deliberately keep no exec-side busy guard (it duplicated eligibility and forced
+; a SexLab script dependency that won't compile against STOCK GAME source).
 Function _PoseVibe(Actor ak, String vibe, String label)
     If !ak || ak == PlayerRef
         Return
