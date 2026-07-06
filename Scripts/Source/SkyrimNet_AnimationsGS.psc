@@ -9,6 +9,58 @@ Actor  PlayerRef
 String _sCurrentPose     = ""
 String _sCurrentPoseDesc = ""
 
+; ── Cross-mod "don't pose this actor right now" guard ────────────────────────
+; The is_busy YAML eligibility gate (see pose_*.yaml) is a snapshot at the moment the LLM decides —
+; it can't see an actor that becomes busy between that decision and this exec actually running (a
+; struggle starting, a defeat landing, a scene beginning). This is the exec-side backstop, checked
+; right before any Debug.SendAnimationEvent, so a pose genuinely never fires mid-scene regardless of
+; timing. All soft/optional: every check is either a plain StorageUtil key (0 if the other mod isn't
+; installed) or a Faction resolved by FormID (None if that mod isn't installed), so this mod keeps
+; working standalone with nothing installed.
+Faction _sexLabAnimFac
+Faction _ostimSceneFac
+
+Bool Function _IsInSexScene(Actor ak)
+    If !_sexLabAnimFac
+        _sexLabAnimFac = Game.GetFormFromFile(0x00E50F, "SexLab.esm") as Faction
+    EndIf
+    If _sexLabAnimFac && ak.GetFactionRank(_sexLabAnimFac) >= 0
+        Return True
+    EndIf
+    If !_ostimSceneFac
+        _ostimSceneFac = Game.GetFormFromFile(0x000ECA, "OStim.esp") as Faction
+    EndIf
+    If _ostimSceneFac && ak.GetFactionRank(_ostimSceneFac) >= 0
+        Return True
+    EndIf
+    Return False
+EndFunction
+
+; Covers: a Baka paired animation/struggle (SNBaka.Locked -- also stays 1 through Baka's own
+; escalation-to-sex-scene, so that case is covered here too), Baka's own downed/ground-window state
+; (SNBaka.OnGround), an Acheron-only hold with no Baka involved (SNAcheron.Held), ANY vanilla
+; bleedout regardless of who caused it -- SeverActions, vanilla combat, Acheron, Baka -- (IsBleedingOut,
+; the same actor-state check that fixed the downed-follower interact bug in Baka's own DLL), and a
+; sex scene that didn't go through Baka at all (_IsInSexScene).
+Bool Function _IsBusyElsewhere(Actor ak)
+    If StorageUtil.GetIntValue(ak, "SNBaka.Locked",   0) == 1
+        Return True
+    EndIf
+    If StorageUtil.GetIntValue(ak, "SNBaka.OnGround", 0) == 1
+        Return True
+    EndIf
+    If StorageUtil.GetIntValue(ak, "SNAcheron.Held",  0) == 1
+        Return True
+    EndIf
+    If ak.IsBleedingOut()
+        Return True
+    EndIf
+    If _IsInSexScene(ak)
+        Return True
+    EndIf
+    Return False
+EndFunction
+
 Event OnInit()
     _Setup()
 EndEvent
@@ -41,6 +93,11 @@ EndFunction
 ; ── DLL fires this when the player clicks a pose. asPose = "GS123" ("" = cancel) ──
 Event OnPoseSelected(String asEventName, String asPose, Float afNum, Form akSender)
     If asPose == ""
+        Return
+    EndIf
+    ; Don't pose the player mid-scene elsewhere (Baka paired anim/struggle/downed, Acheron hold,
+    ; bleedout, or any sex scene) -- see _IsBusyElsewhere.
+    If _IsBusyElsewhere(PlayerRef)
         Return
     EndIf
     ; The grid sends "GS123|short description" — split so we play the event but narrate the description.
@@ -144,16 +201,25 @@ Function _PacifyGS(Actor ak, Bool on)
 EndFunction
 
 ; Play a random pose from `vibe` on a FEMALE NPC, held in place; notify SkyrimNet.
-; NOTE: "don't pose when busy" is enforced at the ELIGIBILITY layer (each pose_*.yaml gates on
-; is_in_combat==false, is_busy==false, and not in the SexLab/OStim animating factions), so the LLM
-; never picks a pose for an occupied NPC. The OnUpdate monitor also frees a casual poser who later
-; enters combat. We deliberately keep no exec-side busy guard (it duplicated eligibility and forced
-; a SexLab script dependency that won't compile against STOCK GAME source).
+; NOTE: "don't pose when busy" is checked at TWO layers now. The pose_*.yaml eligibility gate
+; (is_in_combat==false, is_busy==false, not in the SexLab/OStim animating factions) is the LLM's
+; snapshot at decision time. _IsBusyElsewhere below is the exec-side backstop for everything that
+; can change between that decision and this actually running -- confirmed happening in practice
+; (poses breaking sex scenes/downed poses/Baka struggles), which the eligibility-only snapshot
+; can't catch. No hard SexLab/Baka/Acheron script dependency: factions are resolved by FormID and
+; the rest are plain StorageUtil keys, so this still compiles and runs standalone.
 Function _PoseVibe(Actor ak, String vibe, String label)
     If !ak || ak == PlayerRef
         Return
     EndIf
     If ak.GetActorBase().GetSex() != 1     ; female only — males look wrong posing
+        Return
+    EndIf
+    ; Don't pose someone already busy elsewhere (Baka paired anim/struggle/downed, Acheron hold,
+    ; bleedout, or any sex scene) -- see _IsBusyElsewhere. Re-checked live at exec time: the is_busy
+    ; YAML eligibility gate is only a snapshot from when the LLM decided, and can't see the NPC
+    ; becoming busy between that decision and this actually running.
+    If _IsBusyElsewhere(ak)
         Return
     EndIf
     String csv = _VibeCSV(vibe)
