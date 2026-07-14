@@ -15,6 +15,7 @@ parameterMapping:
     description: YOU — the one striking the pose.
 enabled: true
 defaultPriority: 2
+customCategory: SNBaka_Pose
 eligibilityRules:
   - conditions:
       - decoratorName: "is_in_combat"

@@ -6,7 +6,7 @@ you're doing, and lets the LLM drive nearby **female NPCs** into mood-fitting po
 
 > ⚠️ Adult-adjacent posing content. For adult roleplay.
 
-See [CHANGELOG.md](CHANGELOG.md) for release history. Current version: **v1.0.2**.
+See [CHANGELOG.md](CHANGELOG.md) for release history. Current version: **v1.0.3**.
 
 ## Credits — animations by Gunslicer
 All poses/animations are the work of **Gunslicer** and are **NOT redistributed here**. You must
