@@ -35,6 +35,12 @@ This mod is only the integration layer (PrismaUI selector + SkyrimNet actions + 
 
 ## Requirements
 - **GSPoses by Gunslicer** (the animation pack — required; not included). Build with **FNIS / Nemesis / Pandora**.
+  **`poses.js`'s labels/groupings were curated against exactly this release: [Pose Mod 02.06](https://www.patreon.com/Gunslicer/posts/pose-mod-02-06-159933025)
+  (Patreon, mirrored to Nexus as "GSPoses SE 02 06.7z", dated 2026-06-02).** Gunslicer's pack is
+  actively developed and has been renumbered/reordered between releases before — if a UI label and
+  the animation that actually plays don't match, the most likely cause is a GSPoses version newer
+  or older than the one linked above, not a bug in this mod. Re-curating `poses.js` against your
+  installed version (or installing exactly the release linked above) fixes it either way.
 - **SkyrimNet** (+ SKSE, Address Library)
 - **PrismaUI**
 - **PapyrusUtil**, **powerofthree's Papyrus Extender**

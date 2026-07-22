@@ -40,8 +40,14 @@ EndFunction
 ; escalation-to-sex-scene, so that case is covered here too), Baka's own downed/ground-window state
 ; (SNBaka.OnGround), an Acheron-only hold with no Baka involved (SNAcheron.Held), ANY vanilla
 ; bleedout regardless of who caused it -- SeverActions, vanilla combat, Acheron, Baka -- (IsBleedingOut,
-; the same actor-state check that fixed the downed-follower interact bug in Baka's own DLL), and a
-; sex scene that didn't go through Baka at all (_IsInSexScene).
+; the same actor-state check that fixed the downed-follower interact bug in Baka's own DLL), a sex
+; scene that didn't go through Baka at all (_IsInSexScene), active combat (the is_in_combat YAML gate
+; is the SAME snapshot-at-decision-time problem is_busy already needed a backstop for -- confirmed
+; live report: poses should never fire mid-fight, and the eligibility check alone can't see a fight
+; that started in the gap between the LLM's decision and this actually running), and already sitting
+; on ANYTHING (a real chair, work furniture, or Baka's Lap Sitting integration -- lap-sitting is just
+; a vanilla furniture sit under the hood, so this one check catches both for free with no dependency
+; on Baka's own state at all).
 Bool Function _IsBusyElsewhere(Actor ak)
     If StorageUtil.GetIntValue(ak, "SNBaka.Locked",   0) == 1
         Return True
@@ -56,6 +62,12 @@ Bool Function _IsBusyElsewhere(Actor ak)
         Return True
     EndIf
     If _IsInSexScene(ak)
+        Return True
+    EndIf
+    If ak.IsInCombat()
+        Return True
+    EndIf
+    If ak.GetSitState() != 0
         Return True
     EndIf
     Return False
@@ -101,12 +113,21 @@ Event OnPoseSelected(String asEventName, String asPose, Float afNum, Form akSend
         Return
     EndIf
     ; The grid sends "GS123|short description" — split so we play the event but narrate the description.
-    String[] parts = StringUtil.Split(asPose, "|")
-    _sCurrentPose     = parts[0]
-    _sCurrentPoseDesc = ""
-    If parts.Length > 1
-        _sCurrentPoseDesc = parts[1]
+    ; Manual Find/Substring, not StringUtil.Split -- avoids relying on unclear delimiter semantics
+    ; entirely, and (unlike Split) doesn't truncate the description if it ever contains a second "|".
+    Int pipeAt = StringUtil.Find(asPose, "|")
+    If pipeAt == -1
+        _sCurrentPose     = asPose
+        _sCurrentPoseDesc = ""
+    Else
+        _sCurrentPose     = StringUtil.Substring(asPose, 0, pipeAt)
+        _sCurrentPoseDesc = StringUtil.Substring(asPose, pipeAt + 1)
     EndIf
+    ; Diagnostic for the "UI and played animation don't match" report -- confirms exactly what
+    ; event name this parse produced from the raw string the UI sent, so a mismatch can be pinned
+    ; to "wrong event parsed" vs "right event parsed, wrong animation plays" (a GSPoses-pack-version
+    ; issue, not a Papyrus one) from the very first log line.
+    Debug.Trace("[SNAnimGS] OnPoseSelected: raw='" + asPose + "' -> event='" + _sCurrentPose + "' desc='" + _sCurrentPoseDesc + "'")
     Debug.SendAnimationEvent(PlayerRef, _sCurrentPose)
     String what = "a deliberate pose"
     If _sCurrentPoseDesc != ""
